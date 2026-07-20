@@ -222,7 +222,7 @@ fi
 header "Directories"
 
 mkdir -p "$CONFIG_DIR" "$LOG_DIR"
-chown root:root "$CONFIG_DIR"; chmod 750 "$CONFIG_DIR"
+chown root:"$AGENT_GROUP" "$CONFIG_DIR"; chmod 750 "$CONFIG_DIR"
 chown "$AGENT_USER:$AGENT_GROUP" "$LOG_DIR"; chmod 755 "$LOG_DIR"
 ok "Directories ready."
 
