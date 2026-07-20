@@ -440,6 +440,23 @@ chown root:root "$SUDOERS_PATH"
 command -v visudo &>/dev/null && visudo -c -f "$SUDOERS_PATH" || die "sudoers syntax error."
 ok "sudoers written."
 
+# ── docker credential binds ─────────────────────────────────────────────────
+# ProtectHome=true (below) masks the deploy users' home dirs, hiding
+# ~/.docker/config.json from the sudo'd deploy child — docker then pulls anonymously
+# and private-registry pulls fail with "pull access denied". Re-expose each unique
+# deploy_user's .docker dir read-only. Leading '-' = skip silently if the dir is absent
+# (e.g. --no-create-home system users), so the unit still starts.
+declare -A DOCKER_DIRS
+for key in "${!SUDOERS_ENTRIES[@]}"; do
+    du="${key%%|*}"
+    home="$(getent passwd "$du" | cut -d: -f6)"
+    [[ -n "$home" ]] && DOCKER_DIRS["${home%/}/.docker"]=1
+done
+DOCKER_BINDS=""
+for d in "${!DOCKER_DIRS[@]}"; do
+    DOCKER_BINDS+="BindReadOnlyPaths=-${d}"$'\n'
+done
+
 # ── systemd service ───────────────────────────────────────────────────────────
 header "systemd service"
 
@@ -461,11 +478,8 @@ RestartSec=5s
 
 ReadWritePaths=${LOG_DIR}
 ProtectSystem=strict
-# read-only (not true): sudo'd deploy child inherits this namespace; docker reads
-# credentials from deploy_user's \$HOME/.docker/config.json. ProtectHome=true masks
-# /root with empty tmpfs -> anonymous pull -> "pull access denied" on private registries.
-ProtectHome=read-only
-NoNewPrivileges=false
+ProtectHome=true
+${DOCKER_BINDS}NoNewPrivileges=false
 SystemCallFilter=@system-service
 SystemCallErrorNumber=EPERM
 PrivateTmp=true
