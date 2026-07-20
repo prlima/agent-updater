@@ -461,7 +461,10 @@ RestartSec=5s
 
 ReadWritePaths=${LOG_DIR}
 ProtectSystem=strict
-ProtectHome=true
+# read-only (not true): sudo'd deploy child inherits this namespace; docker reads
+# credentials from deploy_user's \$HOME/.docker/config.json. ProtectHome=true masks
+# /root with empty tmpfs -> anonymous pull -> "pull access denied" on private registries.
+ProtectHome=read-only
 NoNewPrivileges=false
 SystemCallFilter=@system-service
 SystemCallErrorNumber=EPERM

@@ -20,7 +20,12 @@ RestartSec=5s
 # Prevent writing to most of the filesystem
 ReadWritePaths=/var/log/github-agent
 ProtectSystem=strict
-ProtectHome=true
+# read-only (not true): the sudo'd deploy child inherits this namespace, and docker
+# reads credentials from the deploy_user's $HOME/.docker/config.json (e.g. /root/.docker).
+# ProtectHome=true masks /root with an empty tmpfs, so the child pulls anonymously and
+# private-registry pulls fail with "pull access denied". read-only keeps /root readable
+# while still blocking writes to home dirs.
+ProtectHome=read-only
 
 # No new privileges via setuid/setgid
 NoNewPrivileges=true
