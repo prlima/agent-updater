@@ -1,0 +1,44 @@
+[Unit]
+Description=GitHub Actions Webhook Deploy Agent
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=github-agent
+Group=github-agent
+WorkingDirectory=/opt/github-agent
+
+# Secret loaded from a file with mode 0600 owned by github-agent
+EnvironmentFile=/etc/github-agent/env
+
+ExecStart=/usr/local/bin/github-agent -config /etc/github-agent/config.yaml
+Restart=on-failure
+RestartSec=5s
+
+# --- Hardening ---
+# Prevent writing to most of the filesystem
+ReadWritePaths=/var/log/github-agent
+ProtectSystem=strict
+ProtectHome=true
+
+# No new privileges via setuid/setgid
+NoNewPrivileges=true
+
+# Restrict syscalls to a safe set
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+# Isolate private /tmp
+PrivateTmp=true
+
+# Prevent loading kernel modules
+ProtectKernelModules=true
+ProtectKernelTunables=true
+
+# Cap capabilities — the agent itself needs none (sudo handles privilege escalation)
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+[Install]
+WantedBy=multi-user.target

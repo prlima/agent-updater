@@ -1,0 +1,7 @@
+github-agent
+github-agent-linux-amd64
+config.yaml
+*.env
+.env
+dist/
+.DS_Store

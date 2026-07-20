@@ -1,0 +1,34 @@
+server:
+  # MUST be 127.0.0.1 in production — TLS is handled by reverse proxy.
+  addr: "127.0.0.1:9000"
+  read_timeout_seconds: 10
+  write_timeout_seconds: 10
+  max_body_bytes: 10485760  # 10 MiB
+
+webhook:
+  path: "/webhook"
+  # NEVER hardcode. Set env var then reference it here.
+  # export GITHUB_WEBHOOK_SECRET="$(openssl rand -hex 32)"
+  secret: "${GITHUB_WEBHOOK_SECRET}"
+
+repos:
+  - name: "myorg/myrepo"
+    branch: "main"
+    # Workflow name as shown in GitHub Actions (file name or display name).
+    # Leave empty to trigger on any workflow completion on this branch.
+    workflow: "ci.yml"
+    # Absolute path to the project directory on this server.
+    deploy_path: "/home/deploy/projects/myapp"
+    # OS user that owns the project and runs the deploy script.
+    deploy_user: "deploy"
+    # Script filename inside deploy_path to execute on deploy.
+    # Executed as: sudo -n -u <deploy_user> <deploy_path>/<deploy_script>
+    deploy_script: "update.sh"
+
+  # Multiple repos example:
+  # - name: "myorg/another-repo"
+  #   branch: "production"
+  #   workflow: "deploy.yml"
+  #   deploy_path: "/home/acme/projects/another-app"
+  #   deploy_user: "acme"
+  #   deploy_script: "update.sh"
