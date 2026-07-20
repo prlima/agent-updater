@@ -12,9 +12,9 @@ import (
 
 	"golang.org/x/time/rate"
 
-	"github.com/prlima/personal-agent-updater/internal/config"
-	"github.com/prlima/personal-agent-updater/internal/deploy"
-	"github.com/prlima/personal-agent-updater/internal/security"
+	"github.com/prlima/agent-updater/internal/config"
+	"github.com/prlima/agent-updater/internal/deploy"
+	"github.com/prlima/agent-updater/internal/security"
 )
 
 // GitHub workflow_run event payload (only fields we use).

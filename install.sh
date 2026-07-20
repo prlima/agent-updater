@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # github-agent installer / manager
-# Usage: curl -fsSL https://raw.githubusercontent.com/prlima/personal-agent-updater/main/install.sh | sudo bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/prlima/agent-updater/main/install.sh | sudo bash
 set -euo pipefail
 
-REPO="prlima/personal-agent-updater"
+REPO="prlima/agent-updater"
 AGENT_USER="github-agent"
 AGENT_GROUP="github-agent"
 CONFIG_DIR="/etc/github-agent"

@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prlima/personal-agent-updater/internal/config"
+	"github.com/prlima/agent-updater/internal/config"
 )
 
 const (

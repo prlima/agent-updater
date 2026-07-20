@@ -1,4 +1,4 @@
-module github.com/prlima/personal-agent-updater
+module github.com/prlima/agent-updater
 
 go 1.22
 

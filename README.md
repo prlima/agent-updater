@@ -1,4 +1,4 @@
-# personal-agent-updater (github-agent)
+# agent-updater (github-agent)
 
 Self-hosted webhook agent that runs a deploy script on your server when a GitHub Actions workflow completes. Single static binary, zero runtime dependencies.
 
@@ -19,7 +19,7 @@ GitHub workflow completes
 One command, on the server, as root:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/prlima/personal-agent-updater/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/prlima/agent-updater/main/install.sh | sudo bash
 ```
 
 It fetches the latest GitHub release, verifies the SHA256 checksum, installs the binary, creates a dedicated `github-agent` system user, sets up the systemd service, and runs a configuration wizard asking for:
@@ -34,7 +34,7 @@ Running the exact same command again detects the existing install and opens a me
 
 ```
   github-agent installer
-  repo: github.com/prlima/personal-agent-updater
+  repo: github.com/prlima/agent-updater
 
   Status: active   Version: v1.4.0
 

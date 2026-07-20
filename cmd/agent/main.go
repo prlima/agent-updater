@@ -12,9 +12,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/prlima/personal-agent-updater/internal/config"
-	"github.com/prlima/personal-agent-updater/internal/deploy"
-	"github.com/prlima/personal-agent-updater/internal/webhook"
+	"github.com/prlima/agent-updater/internal/config"
+	"github.com/prlima/agent-updater/internal/deploy"
+	"github.com/prlima/agent-updater/internal/webhook"
 )
 
 const shutdownTimeout = 30 * time.Second
