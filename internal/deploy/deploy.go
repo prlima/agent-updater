@@ -71,8 +71,11 @@ func (d *Deployer) Deploy(ctx context.Context, repo *config.RepoConfig, logger *
 	return nil
 }
 
-// runScript executes: sudo -n -u <user> <deploy_path>/<script>
+// runScript executes: sudo -n -H -u <user> <deploy_path>/<script>
 // SECURITY: uses exec.Command with explicit arg list — no shell, no injection risk.
+// -H sets HOME to the target user's home dir so the script sees e.g. /root/.docker/config.json
+// (docker credentials). Without it, HOME stays the agent service user's home and docker
+// pulls anonymously — private-registry pulls then fail with "pull access denied".
 func (d *Deployer) runScript(ctx context.Context, repo *config.RepoConfig, logger *slog.Logger) error {
 	if err := validatePath(repo.DeployPath); err != nil {
 		return fmt.Errorf("deploy_path validation: %w", err)
@@ -80,7 +83,7 @@ func (d *Deployer) runScript(ctx context.Context, repo *config.RepoConfig, logge
 
 	scriptPath := filepath.Join(repo.DeployPath, repo.DeployScript)
 
-	cmd := exec.CommandContext(ctx, "sudo", "-n", "-u", repo.DeployUser, scriptPath)
+	cmd := exec.CommandContext(ctx, "sudo", "-n", "-H", "-u", repo.DeployUser, scriptPath)
 	cmd.Dir = repo.DeployPath
 
 	logger.Info("running deploy script",

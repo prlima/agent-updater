@@ -407,8 +407,8 @@ repos:
 $(printf '%b' "$REPOS_YAML")
 YAML
 
-chmod 0640 "$CONFIG_DIR/config.yaml"
-chown root:"$AGENT_GROUP" "$CONFIG_DIR/config.yaml"
+chmod 0600 "$CONFIG_DIR/config.yaml"
+chown "$AGENT_USER:$AGENT_GROUP" "$CONFIG_DIR/config.yaml"
 ok "config.yaml written."
 
 # ── Write env ─────────────────────────────────────────────────────────────
