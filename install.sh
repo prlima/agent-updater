@@ -246,6 +246,10 @@ if [[ "$ADD_PROJECT_ONLY" -eq 1 ]]; then
     read -r DEPLOY_PATH < /dev/tty
     [[ "$DEPLOY_PATH" == /* ]] || die "Path must be absolute."
     DEPLOY_PATH="$(realpath -m "$DEPLOY_PATH")"
+    # The agent chdir's into DEPLOY_PATH as AGENT_USER before sudo escalates, so the
+    # dir needs a traverse (+x) bit for "other". Grant o+x only (no read/write) if it
+    # exists; ReadWritePaths handles the parent mountpoints in the namespace.
+    [[ -d "$DEPLOY_PATH" ]] && chmod o+x "$DEPLOY_PATH" && ok "chmod o+x $DEPLOY_PATH (agent traverse)."
 
     ask "OS user that owns the project (e.g. deploy):"
     read -r DEPLOY_USER < /dev/tty
@@ -350,6 +354,10 @@ while true; do
     read -r DEPLOY_PATH < /dev/tty
     [[ "$DEPLOY_PATH" == /* ]] || die "Path must be absolute."
     DEPLOY_PATH="$(realpath -m "$DEPLOY_PATH")"
+    # The agent chdir's into DEPLOY_PATH as AGENT_USER before sudo escalates, so the
+    # dir needs a traverse (+x) bit for "other". Grant o+x only (no read/write) if it
+    # exists; ReadWritePaths handles the parent mountpoints in the namespace.
+    [[ -d "$DEPLOY_PATH" ]] && chmod o+x "$DEPLOY_PATH" && ok "chmod o+x $DEPLOY_PATH (agent traverse)."
 
     ask "OS user that owns the project (e.g. deploy):"
     read -r DEPLOY_USER < /dev/tty
@@ -457,6 +465,23 @@ for d in "${!DOCKER_DIRS[@]}"; do
     DOCKER_BINDS+="BindReadOnlyPaths=-${d}"$'\n'
 done
 
+# ── deploy path exposure ─────────────────────────────────────────────────────
+# The agent sets the deploy script's cwd to deploy_path; that chdir runs as
+# AGENT_USER inside this namespace *before* sudo escalates. ProtectSystem=strict
+# makes the whole tree read-only and ProtectHome=true replaces /home with an empty
+# tmpfs — so a deploy_path under /home (or one the script writes to) fails with
+# "chdir ...: permission denied". ReadWritePaths re-binds each deploy_path read-write
+# over both protections and creates 0755 intermediate mountpoints AGENT_USER can
+# traverse. The leaf still needs o+x for AGENT_USER — chmod'd in the repo loop above.
+declare -A DEPLOY_DIRS
+for key in "${!SUDOERS_ENTRIES[@]}"; do
+    DEPLOY_DIRS["$(dirname "${key##*|}")"]=1
+done
+DEPLOY_RW=""
+for d in "${!DEPLOY_DIRS[@]}"; do
+    DEPLOY_RW+="ReadWritePaths=${d}"$'\n'
+done
+
 # ── systemd service ───────────────────────────────────────────────────────────
 header "systemd service"
 
@@ -477,7 +502,7 @@ Restart=on-failure
 RestartSec=5s
 
 ReadWritePaths=${LOG_DIR}
-ProtectSystem=strict
+${DEPLOY_RW}ProtectSystem=strict
 ProtectHome=true
 ${DOCKER_BINDS}NoNewPrivileges=false
 SystemCallFilter=@system-service
