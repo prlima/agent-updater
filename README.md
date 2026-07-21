@@ -36,7 +36,7 @@ Running the exact same command again detects the existing install and opens a me
   github-agent installer
   repo: github.com/prlima/agent-updater
 
-  Status: active   Version: v1.4.0
+  Status: active   Version: vx.x.x
 
   What do you want to do?
 
