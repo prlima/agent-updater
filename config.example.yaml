@@ -22,7 +22,7 @@ repos:
     # OS user that owns the project and runs the deploy script.
     deploy_user: "deploy"
     # Script filename inside deploy_path to execute on deploy.
-    # Executed as: sudo -n -u <deploy_user> <deploy_path>/<deploy_script>
+    # Executed as: sudo -n -H -u <deploy_user> -D <deploy_path> <deploy_path>/<deploy_script>
     deploy_script: "update.sh"
 
   # Multiple repos example:

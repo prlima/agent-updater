@@ -9,7 +9,7 @@ GitHub workflow completes
         ↓
   POST /webhook  (HMAC-SHA256 verified)
         ↓
-  sudo -n -u <deploy_user> /path/to/update.sh
+  sudo -n -H -u <deploy_user> -D <deploy_path> /path/to/update.sh
         ↓
   Deploy done
 ```
@@ -72,7 +72,7 @@ repos:
     workflow: "deploy.yml"        # leave empty to match any workflow
     deploy_path: "/home/deploy/projects/myapp"
     deploy_user: "deploy"
-    deploy_script: "update.sh"    # runs as: sudo -n -u deploy /home/deploy/projects/myapp/update.sh
+    deploy_script: "update.sh"    # runs as: sudo -n -H -u deploy -D /home/deploy/projects/myapp /home/deploy/projects/myapp/update.sh
 ```
 
 The secret is never stored in the config file — it lives in `/etc/github-agent/env` (mode `0600`) and is injected via `${GITHUB_WEBHOOK_SECRET}`.

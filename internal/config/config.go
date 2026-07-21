@@ -48,7 +48,7 @@ type RepoConfig struct {
 	// DeployUser is the OS user that runs the deploy script.
 	DeployUser string `yaml:"deploy_user"`
 	// DeployScript is the script filename to execute inside DeployPath (e.g. "update.sh").
-	// Executed as: sudo -n -H -u DeployUser DeployPath/DeployScript
+	// Executed as: sudo -n -H -u DeployUser -D DeployPath DeployPath/DeployScript
 	DeployScript string `yaml:"deploy_script"`
 }
 
