@@ -79,8 +79,10 @@ func (d *Deployer) Deploy(ctx context.Context, repo *config.RepoConfig, logger *
 // -D (--chdir) makes sudo chdir into deploy_path AFTER switching to the deploy user.
 // Do NOT use cmd.Dir here: Go performs that chdir in the forked child before exec,
 // still as the unprivileged agent user, which cannot traverse /home/<deploy_user>
-// and fails with "chdir ...: permission denied". Requires sudo >= 1.9.3 and a
-// matching CWD= option in the sudoers rule (written by install.sh).
+// and fails with "chdir ...: permission denied". Requires sudo >= 1.9.3 and
+// CWD=* in the sudoers rule (written by install.sh) — per sudoers(5), only
+// "*" authorizes the -D flag; CWD=<exact path> rejects -D and instead forces
+// that cwd on its own.
 func (d *Deployer) runScript(ctx context.Context, repo *config.RepoConfig, logger *slog.Logger) error {
 	if err := validatePath(repo.DeployPath); err != nil {
 		return fmt.Errorf("deploy_path validation: %w", err)

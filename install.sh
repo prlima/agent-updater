@@ -265,8 +265,10 @@ if [[ "$ADD_PROJECT_ONLY" -eq 1 ]]; then
     ok "Project added to config.yaml."
 
     SCRIPT_FULL="${DEPLOY_PATH}/${DEPLOY_SCRIPT}"
-    # CWD= lets the agent use `sudo -D <deploy_path>` (chdir happens as the deploy user)
-    SUDOERS_LINE="$AGENT_USER ALL=(${DEPLOY_USER}) CWD=${DEPLOY_PATH} NOPASSWD: ${SCRIPT_FULL}"
+    # CWD=* authorizes the agent's `sudo -D <deploy_path>` (chdir happens as the
+    # deploy user). NOTE: CWD=<exact path> would NOT allow -D — per sudoers(5),
+    # only "*" permits the -D flag; an exact path just forces that cwd instead.
+    SUDOERS_LINE="$AGENT_USER ALL=(${DEPLOY_USER}) CWD=* NOPASSWD: ${SCRIPT_FULL}"
     if ! grep -qF "$SUDOERS_LINE" "$SUDOERS_PATH" 2>/dev/null; then
         { echo ""; echo "# Project: $SCRIPT_FULL"; echo "$SUDOERS_LINE"; } >> "$SUDOERS_PATH"
         chmod 0440 "$SUDOERS_PATH"
@@ -429,10 +431,11 @@ info "Writing $SUDOERS_PATH..."
     for key in "${!SUDOERS_ENTRIES[@]}"; do
         deploy_user="${key%%|*}"
         script_path="${key##*|}"
-        deploy_dir="$(dirname "$script_path")"
         echo "# Project: $script_path"
-        # CWD= lets the agent use `sudo -D <deploy_path>` (chdir happens as the deploy user)
-        echo "$AGENT_USER ALL=(${deploy_user}) CWD=${deploy_dir} NOPASSWD: ${script_path}"
+        # CWD=* authorizes the agent's `sudo -D <deploy_path>` (chdir happens as the
+        # deploy user). NOTE: CWD=<exact path> would NOT allow -D — per sudoers(5),
+        # only "*" permits the -D flag; an exact path just forces that cwd instead.
+        echo "$AGENT_USER ALL=(${deploy_user}) CWD=* NOPASSWD: ${script_path}"
         echo ""
     done
 } > "$SUDOERS_PATH"
