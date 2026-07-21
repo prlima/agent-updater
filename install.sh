@@ -22,6 +22,72 @@ header() { echo -e "\n${BOLD}${B}▶ $*${NC}"; echo -e "${B}$(printf '%.0s─' {
 ask()    { printf "${Y}  ? %s${NC} " "$*"; }
 sep()    { echo -e "${B}  $(printf '%.0s─' {1..50})${NC}"; }
 
+# ── systemd unit generator ────────────────────────────────────────────────────
+# Rebuilds the unit from the CURRENT config.yaml, so every deploy_path is re-exposed
+# over ProtectHome=true / ProtectSystem=strict. MUST be called after ANY config.yaml
+# change — both fresh install AND "add project". Skipping it on "add project" is the bug
+# that left a newly added deploy_path masked: the agent chdir's into it as AGENT_USER
+# before sudo escalates, and the masked path fails with "chdir ...: permission denied".
+write_systemd_unit() {
+    local cfg="$CONFIG_DIR/config.yaml"
+    [[ -f "$cfg" ]] || die "config.yaml missing — cannot write unit."
+
+    # Unique deploy_paths → ReadWritePaths. Re-binds each path read-write over
+    # ProtectHome/ProtectSystem and creates 0755 intermediate mountpoints AGENT_USER can
+    # traverse. The leaf still needs o+x for AGENT_USER (chmod'd where the repo is added).
+    local DEPLOY_RW="" d
+    while IFS= read -r d; do
+        [[ -n "$d" ]] && DEPLOY_RW+="ReadWritePaths=${d}"$'\n'
+    done < <(grep -oP '(?<=deploy_path: ")[^"]+' "$cfg" | sort -u)
+
+    # Unique deploy_users → their $HOME/.docker exposed read-only. ProtectHome=true masks
+    # home dirs, hiding ~/.docker/config.json from the sudo'd child; without this, docker
+    # pulls anonymously and private-registry pulls fail with "pull access denied".
+    # Leading '-' = skip silently if the dir is absent, so the unit still starts.
+    local DOCKER_BINDS="" u home
+    while IFS= read -r u; do
+        [[ -z "$u" ]] && continue
+        home="$(getent passwd "$u" | cut -d: -f6)"
+        [[ -n "$home" ]] && DOCKER_BINDS+="BindReadOnlyPaths=-${home%/}/.docker"$'\n'
+    done < <(grep -oP '(?<=deploy_user: ")[^"]+' "$cfg" | sort -u)
+
+    cat > "$SERVICE_PATH" <<SERVICE
+[Unit]
+Description=GitHub Actions Webhook Deploy Agent
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=${AGENT_USER}
+Group=${AGENT_GROUP}
+
+EnvironmentFile=${CONFIG_DIR}/env
+ExecStart=${BINARY_PATH} -config ${CONFIG_DIR}/config.yaml
+Restart=on-failure
+RestartSec=5s
+
+ReadWritePaths=${LOG_DIR}
+${DEPLOY_RW}ProtectSystem=strict
+ProtectHome=true
+${DOCKER_BINDS}NoNewPrivileges=false
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+PrivateTmp=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+
+StandardOutput=append:${LOG_DIR}/agent.log
+StandardError=append:${LOG_DIR}/agent.log
+
+[Install]
+WantedBy=multi-user.target
+SERVICE
+
+    chmod 644 "$SERVICE_PATH"
+    systemctl daemon-reload
+}
+
 # ── Preflight ─────────────────────────────────────────────────────────────────
 [[ $EUID -eq 0 ]] || die "Run as root: curl ... | sudo bash"
 [[ $(uname -s) == "Linux" ]] || die "Linux only."
@@ -277,6 +343,12 @@ if [[ "$ADD_PROJECT_ONLY" -eq 1 ]]; then
         ok "sudoers updated."
     fi
 
+    # Regenerate the systemd unit so the new deploy_path gets its ReadWritePaths and the
+    # deploy_user's .docker bind. Without this the new path stays masked by ProtectHome and
+    # the deploy fails with "chdir ...: permission denied".
+    write_systemd_unit
+    ok "systemd unit regenerated (deploy_path re-exposed)."
+
     systemctl restart github-agent
     sleep 1
     systemctl is-active --quiet github-agent && ok "Service restarted." || warn "Failed to restart."
@@ -448,80 +520,14 @@ chown root:root "$SUDOERS_PATH"
 command -v visudo &>/dev/null && visudo -c -f "$SUDOERS_PATH" || die "sudoers syntax error."
 ok "sudoers written."
 
-# ── docker credential binds ─────────────────────────────────────────────────
-# ProtectHome=true (below) masks the deploy users' home dirs, hiding
-# ~/.docker/config.json from the sudo'd deploy child — docker then pulls anonymously
-# and private-registry pulls fail with "pull access denied". Re-expose each unique
-# deploy_user's .docker dir read-only. Leading '-' = skip silently if the dir is absent
-# (e.g. --no-create-home system users), so the unit still starts.
-declare -A DOCKER_DIRS
-for key in "${!SUDOERS_ENTRIES[@]}"; do
-    du="${key%%|*}"
-    home="$(getent passwd "$du" | cut -d: -f6)"
-    [[ -n "$home" ]] && DOCKER_DIRS["${home%/}/.docker"]=1
-done
-DOCKER_BINDS=""
-for d in "${!DOCKER_DIRS[@]}"; do
-    DOCKER_BINDS+="BindReadOnlyPaths=-${d}"$'\n'
-done
-
-# ── deploy path exposure ─────────────────────────────────────────────────────
-# The agent sets the deploy script's cwd to deploy_path; that chdir runs as
-# AGENT_USER inside this namespace *before* sudo escalates. ProtectSystem=strict
-# makes the whole tree read-only and ProtectHome=true replaces /home with an empty
-# tmpfs — so a deploy_path under /home (or one the script writes to) fails with
-# "chdir ...: permission denied". ReadWritePaths re-binds each deploy_path read-write
-# over both protections and creates 0755 intermediate mountpoints AGENT_USER can
-# traverse. The leaf still needs o+x for AGENT_USER — chmod'd in the repo loop above.
-declare -A DEPLOY_DIRS
-for key in "${!SUDOERS_ENTRIES[@]}"; do
-    DEPLOY_DIRS["$(dirname "${key##*|}")"]=1
-done
-DEPLOY_RW=""
-for d in "${!DEPLOY_DIRS[@]}"; do
-    DEPLOY_RW+="ReadWritePaths=${d}"$'\n'
-done
-
 # ── systemd service ───────────────────────────────────────────────────────────
+# Unit is generated from config.yaml by write_systemd_unit (defined near the top), the
+# same path "add project" uses — one source of truth for ReadWritePaths and .docker binds.
 header "systemd service"
 
-cat > "$SERVICE_PATH" <<SERVICE
-[Unit]
-Description=GitHub Actions Webhook Deploy Agent
-After=network.target
-Wants=network.target
-
-[Service]
-Type=simple
-User=${AGENT_USER}
-Group=${AGENT_GROUP}
-
-EnvironmentFile=${CONFIG_DIR}/env
-ExecStart=${BINARY_PATH} -config ${CONFIG_DIR}/config.yaml
-Restart=on-failure
-RestartSec=5s
-
-ReadWritePaths=${LOG_DIR}
-${DEPLOY_RW}ProtectSystem=strict
-ProtectHome=true
-${DOCKER_BINDS}NoNewPrivileges=false
-SystemCallFilter=@system-service
-SystemCallErrorNumber=EPERM
-PrivateTmp=true
-ProtectKernelModules=true
-ProtectKernelTunables=true
-
-StandardOutput=append:${LOG_DIR}/agent.log
-StandardError=append:${LOG_DIR}/agent.log
-
-[Install]
-WantedBy=multi-user.target
-SERVICE
-
-chmod 644 "$SERVICE_PATH"
+write_systemd_unit
 ok "Service file written."
 
-systemctl daemon-reload
 systemctl enable github-agent
 systemctl restart github-agent
 
